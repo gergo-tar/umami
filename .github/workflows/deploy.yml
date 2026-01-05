@@ -27,35 +27,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build tracker and geo (no database build)
+      - name: Generate Prisma client for PostgreSQL
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          DATABASE_TYPE: "postgresql"
+        run: pnpm run build-db
+
+      - name: Build application
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+          DATABASE_TYPE:  "postgresql"
+          SKIP_DB_CHECK: 1
         run: |
           pnpm run build-tracker
           pnpm run build-geo
-
-      - name: Build Next.js application (without DB)
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-          DATABASE_URL: "postgresql://dummy:dummy@localhost: 5432/dummy"
-          DATABASE_TYPE: "postgresql"
-          SKIP_DB_CHECK: 1
-        run: pnpm exec next build --turbo
+          pnpm exec next build --turbo
         
-      - name: Verify build artifacts
+      - name:  Verify build artifacts
         run: |
           echo "=== Build artifacts ==="
           ls -la .next 2>/dev/null && echo "✓ .next exists" || echo "✗ .next missing"
           ls -la public/script.js 2>/dev/null && echo "✓ public/script.js exists" || echo "✗ public/script.js missing"
           ls -la geo 2>/dev/null && echo "✓ geo exists" || echo "✗ geo missing"
+          ls -la generated 2>/dev/null && echo "✓ generated exists" || echo "✗ generated missing"
+          ls -la src/generated 2>/dev/null && echo "✓ src/generated exists" || echo "✗ src/generated missing"
           echo "=== Sizes ==="
-          du -sh .next public/script.js geo 2>/dev/null || true
+          du -sh .next public/script.js geo generated src/generated 2>/dev/null || true
 
       - name: Create tar archive of build artifacts
         run: |
-          tar -czf build-artifacts.tar.gz .next public/script.js geo
+          tar -czf build-artifacts.tar.gz .next public/script.js geo generated src/generated
 
-      - name: Upload build artifacts
+      - name:  Upload build artifacts
         uses: actions/upload-artifact@v4
         with: 
           name:  umami-build-${{ github.sha }}
@@ -76,6 +80,8 @@ jobs:
           tar -xzf build-artifacts.tar.gz
           echo "=== Extracted artifacts ==="
           ls -la
+          echo "=== File count ==="
+          find .next -type f 2>/dev/null | wc -l
 
       - name: Deploy to Forge via rsync
         run: |
@@ -88,14 +94,15 @@ jobs:
           rsync -avz --delete .next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
           rsync -avz geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/
           rsync -avz public/script.js ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/
+          rsync -avz generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/
+          rsync -avz src/generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/src/generated/
 
-      - name:  Generate Prisma client on server
+      - name: Regenerate Prisma client on server (ensure PostgreSQL compatibility)
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }} << 'EOF'
             cd ${{ secrets.FORGE_PATH }}
-            export DATABASE_TYPE=postgresql
             pnpm run build-db
           EOF
 
-      - name:  Trigger Forge Deploy Script
-        run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
+      - name: Trigger Forge Deploy Script
+        run:  curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
