@@ -1,7 +1,7 @@
 name: Build and Deploy Umami
 
 on:
-  push: 
+  push:  
     branches: [ master ]
   workflow_dispatch:
 
@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses:  actions/checkout@v4
+        uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -43,34 +43,33 @@ jobs:
           echo "=== Sizes ==="
           du -sh .next public/script.js geo 2>/dev/null || true
 
+      - name: Create tar archive of build artifacts
+        run: |
+          tar -czf build-artifacts.tar.gz .next public/script.js geo
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name:  umami-build-${{ github.sha }}
+          path: build-artifacts.tar.gz
           retention-days: 30
-          include-hidden-files: true
-          compression-level: 6
-          path: |
-            .next/
-            public/script.js
-            geo/
 
   deploy:
-    needs: build
+    needs:  build
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: umami-build-${{ github.sha }}
-          path: build-output
 
-      - name:  Verify downloaded artifacts
+      - name: Extract build artifacts
         run: |
-          echo "=== Downloaded artifacts ==="
-          ls -laR build-output
+          tar -xzf build-artifacts.tar.gz
+          echo "=== Extracted artifacts ==="
+          ls -la
           echo "=== File count ==="
-          find build-output -type f | wc -l
+          find .next -type f | wc -l
 
       - name: Deploy to Forge via rsync
         run: |
@@ -80,9 +79,9 @@ jobs:
           ssh-keyscan -H ${{ secrets.FORGE_HOST }} >> ~/.ssh/known_hosts
           
           # Deploy artifacts to correct locations
-          rsync -avz --delete build-output/.next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
-          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/
-          rsync -avz build-output/public/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/
+          rsync -avz --delete .next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
+          rsync -avz geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/
+          rsync -avz public/script.js ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/
 
       - name:  Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
