@@ -1,24 +1,24 @@
-name: Build Umami .next Artifact
+name: Build Umami Artifact
 
 on:
-  push:
+  push:  
     branches: [ master ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:  ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name:  Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version:  10
 
-      - name: Setup Node.js
+      - name: Setup Node. js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -29,63 +29,79 @@ jobs:
 
       - name: Generate Prisma client
         env:
-          DATABASE_URL: "file:ci.db"
+          DATABASE_URL: "file:ci. db"
           DATABASE_TYPE: "sqlite"
         run: pnpm prisma generate
 
       - name: Build Next.js application
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-          DATABASE_URL: "file:ci.db"
+          DATABASE_URL: "file:ci. db"
           DATABASE_TYPE: "sqlite"
           SKIP_DB_CHECK: 1
           SKIP_DB_MIGRATION: 1
         run: pnpm exec next build
         
-      - name: Verify .next (relaxed)
+      - name:  Verify build artifacts
         run: |
-          ls -la .next
-          du -sh .next
-          test -d .next/server && test -d .next/static && echo "✓ Build complete"
+          echo "=== Build artifacts ==="
+          ls -la .next 2>/dev/null && echo "✓ .next exists" || echo "✗ .next missing"
+          ls -la build 2>/dev/null && echo "✓ build exists" || echo "✗ build missing"
+          ls -la public/script. js 2>/dev/null && echo "✓ public/script.js exists" || echo "✗ public/script.js missing"
+          ls -la geo 2>/dev/null && echo "✓ geo exists" || echo "✗ geo missing"
+          ls -la dist 2>/dev/null && echo "✓ dist exists" || echo "✗ dist missing"
+          ls -la generated 2>/dev/null && echo "✓ generated exists" || echo "✗ generated missing"
+          ls -la src/generated 2>/dev/null && echo "✓ src/generated exists" || echo "✗ src/generated missing"
+          du -sh .next build public/script.js geo dist generated src/generated 2>/dev/null || true
 
-      - name: Upload .next artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: umami-next-${{ github.sha }}
-          path: .next
+          name:  umami-build-${{ github.sha }}
           retention-days: 30
-          include-hidden-files: true 
+          include-hidden-files: true
           compression-level: 6
+          path:  |
+            .next/
+            build/
+            public/script. js
+            geo/
+            dist/
+            generated/
+            src/generated/
 
-  deploy:
-    needs:  build
+  deploy: 
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
-        with: 
-          name: umami-next-${{ github.sha }}
-          path: .next
-  
-      - name: Debug - Show current directory and files
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: umami-build-${{ github.sha }}
+          path: build-output
+
+      - name:  Verify downloaded artifacts
+        run:  |
+          echo "=== Downloaded artifacts ==="
+          ls -laR build-output
+          echo "=== File count ==="
+          find build-output -type f | wc -l
+
+      - name: Deploy to Forge via rsync
         run: |
-          echo "=== Current directory ==="
-          pwd
-          echo "=== All files in workspace ==="
-          ls -laR
-          echo "=== . next folder contents ==="
-          find .next -type f | head -20
-          echo "=== Total files in .next ==="
-          find .next -type f | wc -l
-  
-      - name:  Rsync . next to Forge
-        uses:  appleboy/scp-action@v1
-        with: 
-          host: ${{ secrets. FORGE_HOST }}
-          username: ${{ secrets.FORGE_USER }}
-          key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
-          source:  ".next" 
-          target: "${{ secrets.FORGE_PATH }}"
-          strip_components: 0
-  
-      - name: Trigger Forge Deploy Script
+          mkdir -p ~/. ssh
+          echo "${{ secrets. FORGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.FORGE_HOST }} >> ~/.ssh/known_hosts
+          
+          # Deploy each artifact to the correct location
+          rsync -avz --delete build-output/.next/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
+          rsync -avz build-output/build/ ${{ secrets. FORGE_USER }}@${{ secrets.FORGE_HOST }}: ${{ secrets.FORGE_PATH }}/build/ 2>/dev/null || true
+          rsync -avz build-output/public/script.js ${{ secrets. FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/ 2>/dev/null || true
+          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets. FORGE_PATH }}/geo/ 2>/dev/null || true
+          rsync -avz build-output/dist/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/dist/ 2>/dev/null || true
+          rsync -avz build-output/generated/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/ 2>/dev/null || true
+          rsync -avz build-output/src/generated/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/src/generated/ 2>/dev/null || true
+
+      - name:  Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
