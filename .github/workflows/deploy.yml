@@ -65,15 +65,25 @@ jobs:
         with:
           name: umami-next-${{ github.sha }}
           path: .next
-
-      - name: Rsync .next to Forge
-        uses: appleboy/scp-action@v1
-        with:
-          host: ${{ secrets.FORGE_HOST }}
-          username: ${{ secrets.FORGE_USER }}
+  
+      - name: Verify artifact download
+        run: |
+          echo "=== Contents of .next folder ==="
+          ls -laR .next
+          echo "=== Disk usage ==="
+          du -sh .next/*
+          echo "=== File count ==="
+          find .next -type f | wc -l
+  
+      - name: Rsync . next to Forge
+        uses:  appleboy/scp-action@v1
+        with: 
+          host: ${{ secrets. FORGE_HOST }}
+          username:  ${{ secrets.FORGE_USER }}
           key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
-          source: ".next/**/*"
-          target: "${{ secrets.FORGE_PATH }}"
+          source: ". next/"
+          target: "${{ secrets. FORGE_PATH }}"
+          strip_components: 0
           rm: false
 
       - name: Trigger Forge Deploy Script
