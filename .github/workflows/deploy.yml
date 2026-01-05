@@ -74,7 +74,7 @@ jobs:
           key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
           source: ".next/**/*"
           target: "${{ secrets.FORGE_PATH }}"
-          rm: true
+          rm: false
 
       - name: Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
