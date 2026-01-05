@@ -83,7 +83,7 @@ jobs:
           host: ${{ secrets. FORGE_HOST }}
           username: ${{ secrets.FORGE_USER }}
           key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
-          source:  ". next"  # No wildcards - copy entire directory
+          source:  ".next" 
           target: "${{ secrets.FORGE_PATH }}"
           strip_components: 0
   
