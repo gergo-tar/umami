@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on:  ubuntu-latest
+  build:  
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name:  Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
@@ -27,14 +27,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build application (full build)
+      - name: Build tracker and geo (no database build)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-          DATABASE_URL: "file:ci.db"
-          DATABASE_TYPE: "sqlite"
-        run:  pnpm run build-docker
+        run: |
+          pnpm run build-tracker
+          pnpm run build-geo
+
+      - name: Build Next.js application (without DB)
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          DATABASE_URL: "postgresql://dummy:dummy@localhost: 5432/dummy"
+          DATABASE_TYPE: "postgresql"
+          SKIP_DB_CHECK: 1
+        run: pnpm exec next build --turbo
         
-      - name:  Verify build artifacts
+      - name: Verify build artifacts
         run: |
           echo "=== Build artifacts ==="
           ls -la .next 2>/dev/null && echo "✓ .next exists" || echo "✗ .next missing"
@@ -49,7 +57,7 @@ jobs:
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
-        with:
+        with: 
           name:  umami-build-${{ github.sha }}
           path: build-artifacts.tar.gz
           retention-days: 30
@@ -68,8 +76,6 @@ jobs:
           tar -xzf build-artifacts.tar.gz
           echo "=== Extracted artifacts ==="
           ls -la
-          echo "=== File count ==="
-          find .next -type f | wc -l
 
       - name: Deploy to Forge via rsync
         run: |
@@ -82,6 +88,14 @@ jobs:
           rsync -avz --delete .next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
           rsync -avz geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/
           rsync -avz public/script.js ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/
+
+      - name:  Generate Prisma client on server
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }} << 'EOF'
+            cd ${{ secrets.FORGE_PATH }}
+            export DATABASE_TYPE=postgresql
+            pnpm run build-db
+          EOF
 
       - name:  Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
