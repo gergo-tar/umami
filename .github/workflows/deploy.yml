@@ -18,7 +18,7 @@ jobs:
         with:
           version:  10
 
-      - name: Setup Node. js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -29,14 +29,14 @@ jobs:
 
       - name: Generate Prisma client
         env:
-          DATABASE_URL: "file:ci. db"
+          DATABASE_URL: "file:ci.db"
           DATABASE_TYPE: "sqlite"
         run: pnpm prisma generate
 
       - name: Build Next.js application
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-          DATABASE_URL: "file:ci. db"
+          DATABASE_URL: "file:ci.db"
           DATABASE_TYPE: "sqlite"
           SKIP_DB_CHECK: 1
           SKIP_DB_MIGRATION: 1
@@ -47,7 +47,7 @@ jobs:
           echo "=== Build artifacts ==="
           ls -la .next 2>/dev/null && echo "✓ .next exists" || echo "✗ .next missing"
           ls -la build 2>/dev/null && echo "✓ build exists" || echo "✗ build missing"
-          ls -la public/script. js 2>/dev/null && echo "✓ public/script.js exists" || echo "✗ public/script.js missing"
+          ls -la public/script.js 2>/dev/null && echo "✓ public/script.js exists" || echo "✗ public/script.js missing"
           ls -la geo 2>/dev/null && echo "✓ geo exists" || echo "✗ geo missing"
           ls -la dist 2>/dev/null && echo "✓ dist exists" || echo "✗ dist missing"
           ls -la generated 2>/dev/null && echo "✓ generated exists" || echo "✗ generated missing"
@@ -64,7 +64,7 @@ jobs:
           path:  |
             .next/
             build/
-            public/script. js
+            public/script.js
             geo/
             dist/
             generated/
@@ -89,18 +89,18 @@ jobs:
 
       - name: Deploy to Forge via rsync
         run: |
-          mkdir -p ~/. ssh
-          echo "${{ secrets. FORGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          mkdir -p ~/.ssh
+          echo "${{ secrets.FORGE_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.FORGE_HOST }} >> ~/.ssh/known_hosts
           
           # Deploy each artifact to the correct location
-          rsync -avz --delete build-output/.next/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
-          rsync -avz build-output/build/ ${{ secrets. FORGE_USER }}@${{ secrets.FORGE_HOST }}: ${{ secrets.FORGE_PATH }}/build/ 2>/dev/null || true
-          rsync -avz build-output/public/script.js ${{ secrets. FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/ 2>/dev/null || true
-          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets. FORGE_PATH }}/geo/ 2>/dev/null || true
+          rsync -avz --delete build-output/.next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
+          rsync -avz build-output/build/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}: ${{ secrets.FORGE_PATH }}/build/ 2>/dev/null || true
+          rsync -avz build-output/public/script.js ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/ 2>/dev/null || true
+          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/ 2>/dev/null || true
           rsync -avz build-output/dist/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/dist/ 2>/dev/null || true
-          rsync -avz build-output/generated/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/ 2>/dev/null || true
+          rsync -avz build-output/generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/ 2>/dev/null || true
           rsync -avz build-output/src/generated/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/src/generated/ 2>/dev/null || true
 
       - name:  Trigger Forge Deploy Script
