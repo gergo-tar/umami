@@ -2,30 +2,27 @@ name: Build Umami Frontend & Artifact
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:  ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name:  Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
+        with: 
           version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        with:
+        with: 
           node-version: 20
           cache: "pnpm"
-
-      - name: Install pnpm globally
-        run: npm install --global pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -36,7 +33,7 @@ jobs:
           DATABASE_TYPE: "sqlite"
         run: pnpm prisma generate
 
-      - name: Direct Next.js build (skip custom scripts)
+      - name:  Build Next.js application
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           DATABASE_URL: "file:ci.db"
@@ -45,19 +42,48 @@ jobs:
           SKIP_DB_MIGRATION: 1
         run: pnpm exec next build
 
-      - name: Debug .next contents
+      - name:  Prepare deployment artifact
         run: |
-          echo "=== Directory listing ==="
-          ls -la ./
-          echo "=== .next contents ==="
-          ls -la .next/ || echo ".next missing!"
-          du -sh .next/* 2>/dev/null || echo "No contents"
-          find .next -type f | head -10 || echo "Empty"
+          echo "=== Creating deployment package ==="
+          mkdir -p deploy-package
+          
+          # Copy build output
+          cp -r . next deploy-package/
+          
+          # Copy necessary files for deployment
+          cp package.json deploy-package/
+          cp pnpm-lock.yaml deploy-package/
+          
+          # Copy public assets if they exist
+          if [ -d "public" ]; then
+            cp -r public deploy-package/
+          fi
+          
+          # Copy prisma schema if it exists
+          if [ -d "prisma" ]; then
+            cp -r prisma deploy-package/
+          fi
+          
+          echo "=== Package contents ==="
+          ls -la deploy-package/
+          du -sh deploy-package/*
 
-      - name: Upload .next artifact
-        if: hashFiles('.next/**') != ''
+      - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
         with:
-          name: umami-next
-          path: .next
-          retention-days: 7
+          name: umami-deployment-${{ github.sha }}
+          path: deploy-package/
+          retention-days: 30
+          compression-level: 6
+
+      - name: Upload build summary
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifact Name:** umami-deployment-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Download artifact:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "gh run download ${{ github.run_id }} -n umami-deployment-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
