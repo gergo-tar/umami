@@ -51,7 +51,6 @@ jobs:
           cp -r .next deploy-package/
           
           # Copy necessary files for deployment
-          cp package.json deploy-package/
           cp pnpm-lock.yaml deploy-package/ || echo "No pnpm-lock.yaml found"
           
           # Copy public assets if they exist
