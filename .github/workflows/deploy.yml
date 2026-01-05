@@ -58,33 +58,34 @@ jobs:
           compression-level: 6
 
   deploy:
-    needs: build
+    needs:  build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
-        with:
+        with: 
           name: umami-next-${{ github.sha }}
           path: .next
   
-      - name: Verify artifact download
+      - name: Debug - Show current directory and files
         run: |
-          echo "=== Contents of .next folder ==="
-          ls -laR .next
-          echo "=== Disk usage ==="
-          du -sh .next/*
-          echo "=== File count ==="
+          echo "=== Current directory ==="
+          pwd
+          echo "=== All files in workspace ==="
+          ls -laR
+          echo "=== . next folder contents ==="
+          find .next -type f | head -20
+          echo "=== Total files in .next ==="
           find .next -type f | wc -l
   
-      - name: Rsync . next to Forge
+      - name:  Rsync . next to Forge
         uses:  appleboy/scp-action@v1
         with: 
           host: ${{ secrets. FORGE_HOST }}
-          username:  ${{ secrets.FORGE_USER }}
+          username: ${{ secrets.FORGE_USER }}
           key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
-          source: ". next/"
-          target: "${{ secrets. FORGE_PATH }}"
+          source:  ". next"  # No wildcards - copy entire directory
+          target: "${{ secrets.FORGE_PATH }}"
           strip_components: 0
-          rm: false
-
+  
       - name: Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
