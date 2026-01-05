@@ -73,7 +73,7 @@ jobs:
           username: ${{ secrets.FORGE_USER }}
           key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
           source: ".next/**/*"
-          target: "${{ secrets.FORGE_PATH }}/.next"
+          target: "${{ secrets.FORGE_PATH }}"
           rm: true
 
       - name: Trigger Forge Deploy Script
