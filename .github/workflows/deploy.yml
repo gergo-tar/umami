@@ -21,6 +21,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           SKIP_DB_CHECK: 1
+          SKIP_DB_MIGRATION: 1
       - name: Upload .next artifact
         uses: actions/upload-artifact@v4
         with:
