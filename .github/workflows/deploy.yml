@@ -1,0 +1,29 @@
+name: Build & Artifact
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20  # Update from 18 for stability
+          cache: "pnpm"
+      - run: npm install --global pnpm
+      - run: pnpm install
+      - run: pnpm build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          SKIP_DB_CHECK: 1
+      - name: Upload .next artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: umami-next
+          path: .next
+          retention-days: 7
