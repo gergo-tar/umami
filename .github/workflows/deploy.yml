@@ -56,3 +56,25 @@ jobs:
           retention-days: 30
           include-hidden-files: true 
           compression-level: 6
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: umami-next-${{ github.sha }}
+          path: .next
+
+      - name: Rsync .next to Forge
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.FORGE_HOST }}
+          username: ${{ secrets.FORGE_USER }}
+          key: ${{ secrets.FORGE_SSH_KEY }}
+          source: ".next/**/*"
+          target: "${{ secrets.FORGE_PATH }}/.next"
+          rm: true
+
+      - name: Trigger Forge Deploy Script
+        run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
