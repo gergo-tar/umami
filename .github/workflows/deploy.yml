@@ -3,7 +3,7 @@ name: Build Umami Frontend & Artifact
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 jobs:
   build:
@@ -30,16 +30,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Umami (frontend only)
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: "file:ci.db"
+          DATABASE_TYPE: "sqlite"
+        run: pnpm prisma generate
+
+      - name: Direct Next.js build (skip custom scripts)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-          DATABASE_URL: "file:./dev.db"
+          DATABASE_URL: "file:ci.db"
           DATABASE_TYPE: "sqlite"
           SKIP_DB_CHECK: 1
           SKIP_DB_MIGRATION: 1
-        run: pnpm build
+        run: pnpm exec next build
+
+      - name: Debug .next contents
+        run: |
+          echo "=== Directory listing ==="
+          ls -la ./
+          echo "=== .next contents ==="
+          ls -la .next/ || echo ".next missing!"
+          du -sh .next/* 2>/dev/null || echo "No contents"
+          find .next -type f | head -10 || echo "Empty"
 
       - name: Upload .next artifact
+        if: hashFiles('.next/**') != ''
         uses: actions/upload-artifact@v4
         with:
           name: umami-next
