@@ -1,7 +1,7 @@
-name: Build Umami Artifact
+name: Build and Deploy Umami
 
 on:
-  push:  
+  push: 
     branches: [ master ]
   workflow_dispatch:
 
@@ -10,8 +10,8 @@ jobs:
     runs-on:  ubuntu-latest
 
     steps:
-      - name:  Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses:  actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -27,32 +27,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
-        env:
-          DATABASE_URL: "file:ci.db"
-          DATABASE_TYPE: "sqlite"
-        run: pnpm prisma generate
-
-      - name: Build Next.js application
+      - name: Build application (full build)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           DATABASE_URL: "file:ci.db"
           DATABASE_TYPE: "sqlite"
-          SKIP_DB_CHECK: 1
-          SKIP_DB_MIGRATION: 1
-        run: pnpm exec next build
+        run:  pnpm run build-docker
         
       - name:  Verify build artifacts
         run: |
           echo "=== Build artifacts ==="
           ls -la .next 2>/dev/null && echo "✓ .next exists" || echo "✗ .next missing"
-          ls -la build 2>/dev/null && echo "✓ build exists" || echo "✗ build missing"
           ls -la public/script.js 2>/dev/null && echo "✓ public/script.js exists" || echo "✗ public/script.js missing"
           ls -la geo 2>/dev/null && echo "✓ geo exists" || echo "✗ geo missing"
-          ls -la dist 2>/dev/null && echo "✓ dist exists" || echo "✗ dist missing"
-          ls -la generated 2>/dev/null && echo "✓ generated exists" || echo "✗ generated missing"
-          ls -la src/generated 2>/dev/null && echo "✓ src/generated exists" || echo "✗ src/generated missing"
-          du -sh .next build public/script.js geo dist generated src/generated 2>/dev/null || true
+          echo "=== Sizes ==="
+          du -sh .next public/script.js geo 2>/dev/null || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -61,16 +50,12 @@ jobs:
           retention-days: 30
           include-hidden-files: true
           compression-level: 6
-          path:  |
+          path: |
             .next/
-            build/
             public/script.js
             geo/
-            dist/
-            generated/
-            src/generated/
 
-  deploy: 
+  deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -81,7 +66,7 @@ jobs:
           path: build-output
 
       - name:  Verify downloaded artifacts
-        run:  |
+        run: |
           echo "=== Downloaded artifacts ==="
           ls -laR build-output
           echo "=== File count ==="
@@ -94,14 +79,10 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.FORGE_HOST }} >> ~/.ssh/known_hosts
           
-          # Deploy each artifact to the correct location
+          # Deploy artifacts to correct locations
           rsync -avz --delete build-output/.next/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/.next/
-          rsync -avz build-output/build/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}: ${{ secrets.FORGE_PATH }}/build/ 2>/dev/null || true
-          rsync -avz build-output/public/script.js ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/ 2>/dev/null || true
-          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/ 2>/dev/null || true
-          rsync -avz build-output/dist/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/dist/ 2>/dev/null || true
-          rsync -avz build-output/generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/ 2>/dev/null || true
-          rsync -avz build-output/src/generated/ ${{ secrets.FORGE_USER }}@${{ secrets. FORGE_HOST }}:${{ secrets.FORGE_PATH }}/src/generated/ 2>/dev/null || true
+          rsync -avz build-output/geo/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/geo/
+          rsync -avz build-output/public/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/public/
 
       - name:  Trigger Forge Deploy Script
         run: curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
