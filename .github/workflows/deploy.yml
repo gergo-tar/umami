@@ -1,4 +1,4 @@
-name: Build Umami Frontend & Artifact
+name: Build Umami .next Artifact
 
 on:
   push:
@@ -7,20 +7,20 @@ on:
 
 jobs:
   build:
-    runs-on:  ubuntu-latest
+    runs-on: ubuntu-latest
 
     steps:
-      - name:  Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with: 
+        with:
           version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        with: 
+        with:
           node-version: 20
           cache: "pnpm"
 
@@ -33,7 +33,7 @@ jobs:
           DATABASE_TYPE: "sqlite"
         run: pnpm prisma generate
 
-      - name:  Build Next.js application
+      - name: Build Next.js application
         env:
           NODE_OPTIONS: --max-old-space-size=4096
           DATABASE_URL: "file:ci.db"
@@ -42,58 +42,15 @@ jobs:
           SKIP_DB_MIGRATION: 1
         run: pnpm exec next build
 
-      - name:  Prepare deployment artifact
+      - name: Verify .next
         run: |
-          echo "=== Creating deployment package ==="
-          mkdir -p deploy-package
-          
-          # Copy build output
-          cp -r .next deploy-package/
-          
-          # Copy necessary files for deployment
-          cp pnpm-lock.yaml deploy-package/ || echo "No pnpm-lock.yaml found"
-          
-          # Copy public assets if they exist
-          if [ -d "public" ]; then
-            cp -r public deploy-package/
-          fi
-          
-          # Copy prisma schema if it exists
-          if [ -d "prisma" ]; then
-            cp -r prisma deploy-package/
-          fi
+          ls -la .next
+          du -sh .next
+          test -f .next/server/app/index.js && echo "✓ Production build ready" || exit 1
 
-          # Copy next.config.js if it exists
-          if [ -f "next.config.js" ]; then
-            cp next.config.js deploy-package/
-          fi
-          
-          # Copy next.config.mjs if it exists
-          if [ -f "next.config.mjs" ]; then
-            cp next.config.mjs deploy-package/
-          fi
-          
-          echo "=== Package contents ==="
-          ls -la deploy-package/
-          echo "=== Package size ==="
-          du -sh deploy-package/*
-
-      - name: Upload deployment artifact
+      - name: Upload .next artifact (flat)
         uses: actions/upload-artifact@v4
         with:
-          name: umami-deployment-${{ github.sha }}
-          path: deploy-package/
+          name: umami-next-${{ github.sha }}
+          path: .next
           retention-days: 30
-          compression-level: 6
-
-      - name: Upload build summary
-        run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit SHA:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifact Name:** umami-deployment-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Download artifact:" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "gh run download ${{ github.run_id }} -n umami-deployment-${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
