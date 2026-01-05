@@ -1,27 +1,44 @@
-name: Build & Artifact
+name: Build Umami Frontend & Artifact
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10
-      - name: Use Node.js
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20  # Update from 18 for stability
+          node-version: 20
           cache: "pnpm"
-      - run: npm install --global pnpm
-      - run: pnpm install
-      - run: pnpm build
+
+      - name: Install pnpm globally
+        run: npm install --global pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Umami (frontend only)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          DATABASE_URL: "file:./dev.db"
+          DATABASE_TYPE: "sqlite"
           SKIP_DB_CHECK: 1
           SKIP_DB_MIGRATION: 1
+        run: pnpm build
+
       - name: Upload .next artifact
         uses: actions/upload-artifact@v4
         with:
