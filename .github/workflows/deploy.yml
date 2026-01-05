@@ -97,12 +97,5 @@ jobs:
           rsync -avz generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/generated/
           rsync -avz src/generated/ ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }}:${{ secrets.FORGE_PATH }}/src/generated/
 
-      - name: Regenerate Prisma client on server (ensure PostgreSQL compatibility)
-        run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.FORGE_USER }}@${{ secrets.FORGE_HOST }} << 'EOF'
-            cd ${{ secrets.FORGE_PATH }}
-            pnpm run build-db
-          EOF
-
       - name: Trigger Forge Deploy Script
         run:  curl -X POST "${{ secrets.FORGE_DEPLOY_URL }}"
