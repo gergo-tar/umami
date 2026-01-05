@@ -71,7 +71,7 @@ jobs:
         with:
           host: ${{ secrets.FORGE_HOST }}
           username: ${{ secrets.FORGE_USER }}
-          key: ${{ secrets.FORGE_SSH_KEY }}
+          key: ${{ secrets.FORGE_SSH_PRIVATE_KEY }}
           source: ".next/**/*"
           target: "${{ secrets.FORGE_PATH }}/.next"
           rm: true
