@@ -48,11 +48,11 @@ jobs:
           mkdir -p deploy-package
           
           # Copy build output
-          cp -r . next deploy-package/
+          cp -r .next deploy-package/
           
           # Copy necessary files for deployment
           cp package.json deploy-package/
-          cp pnpm-lock.yaml deploy-package/
+          cp pnpm-lock.yaml deploy-package/ || echo "No pnpm-lock.yaml found"
           
           # Copy public assets if they exist
           if [ -d "public" ]; then
@@ -63,9 +63,20 @@ jobs:
           if [ -d "prisma" ]; then
             cp -r prisma deploy-package/
           fi
+
+          # Copy next.config.js if it exists
+          if [ -f "next.config.js" ]; then
+            cp next.config.js deploy-package/
+          fi
+          
+          # Copy next.config.mjs if it exists
+          if [ -f "next.config.mjs" ]; then
+            cp next.config.mjs deploy-package/
+          fi
           
           echo "=== Package contents ==="
           ls -la deploy-package/
+          echo "=== Package size ==="
           du -sh deploy-package/*
 
       - name: Upload deployment artifact
